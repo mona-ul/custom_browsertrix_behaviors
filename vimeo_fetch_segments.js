@@ -22,22 +22,13 @@ class VimeoFetch {
     await VimeoFetch.clickPlayButton(ctx);
 
 
-    const { playerUrls, m3u8_url, player_json, fresnel_player_stats, session_id } = await VimeoFetch.readPlayerConfig(ctx);
+    const { playerUrls, player_json} = await VimeoFetch.readPlayerConfig(ctx);
         
-    // Get player stats with session id
-    if (fresnel_player_stats && session_id) {
-      const fresnel_player_stats_session_id = `${fresnel_player_stats}?beacon=1&session-id=${session_id}`;
-      ctx.log(`fresnel_player_stats_session_id: ${fresnel_player_stats_session_id}`);
-      await VimeoFetch.requestAllUrls([fresnel_player_stats_session_id], [], [], [], ctx);
-        
-    } else {
-      console.warn("No valid fresnel_player_stats or session_id");
-    }
 
     /// get player urls
     if (playerUrls && playerUrls.length > 0) {
       ctx.Lib.getState(ctx, "Extracted segment URLs", playerUrls.join(", "));
-      await VimeoFetch.requestAllUrls([], playerUrls, [], [], ctx);
+      await VimeoFetch.requestAllUrls(playerUrls, [], [], ctx);
     } else {
       console.warn("No valid playerUrls found.");
     }
@@ -107,7 +98,7 @@ class VimeoFetch {
         VimeoFetch.stopVideo(ctx);
         
         // Request Segment URLs
-        await VimeoFetch.requestAllUrls([], [], videoUrls, audioUrls, ctx);
+        await VimeoFetch.requestAllUrls([], videoUrls, audioUrls, ctx);
 
       } catch (error) {
         console.error("Failed to parse or extract the data:", error);
@@ -131,10 +122,7 @@ class VimeoFetch {
 
   static async readPlayerConfig(ctx) {
     let playerUrls = [];
-    let m3u8_url = null;
     let player_json = null;
-    let fresnel_player_stats = null;
-    let session_id = null;
     const scriptTags = document.querySelectorAll('script');
     console.log("script tags:", scriptTags);
     ctx.log(`script tags: ${scriptTags}`);
@@ -185,22 +173,6 @@ class VimeoFetch {
                 playerConfig &&
                 playerConfig.request &&
                 playerConfig.request.files &&
-                playerConfig.request.files.hls &&
-                playerConfig.request.files.hls.cdns &&
-                playerConfig.request.files.hls.cdns.akfire_interconnect_quic &&
-                playerConfig.request.files.hls.cdns.akfire_interconnect_quic.url
-              ) {
-                m3u8_url = playerConfig.request.files.hls.cdns.akfire_interconnect_quic.url;
-                ctx.log(`Extracted HLS URL: ${m3u8_url}`);
-                console.log("Found M3U8 URL:", m3u8_url);
-              } else {
-                console.warn("No 'akfire_interconnect_quic.url' found in the playerConfig.");
-              }
-
-              if (
-                playerConfig &&
-                playerConfig.request &&
-                playerConfig.request.files &&
                 playerConfig.request.files.dash &&
                 playerConfig.request.files.dash.cdns &&
                 playerConfig.request.files.dash.cdns.akfire_interconnect_quic &&
@@ -213,21 +185,6 @@ class VimeoFetch {
                 console.warn("No 'player_json' found in the playerConfig.");
               }
 
-              if (
-                playerConfig &&
-                playerConfig.request &&
-                playerConfig.request.urls &&
-                playerConfig.request.urls.fresnel
-              ) {
-                fresnel_player_stats = playerConfig.request.urls.fresnel;
-                ctx.log(`Extracted fresnel_player_stats URL: ${fresnel_player_stats}`);
-                console.log("Found fresnel_player_stats URL:", fresnel_player_stats);
-              } else {
-                console.warn("No fresnel_player_stats found in the playerConfig.");
-              }
-              
-              session_id = playerConfig.request.session;
-
             } catch (error) {
                 console.error("Error parsing playerConfig:", error);
             }
@@ -235,7 +192,7 @@ class VimeoFetch {
         }
       }
 
-    return { playerUrls, m3u8_url, player_json, fresnel_player_stats, session_id };  // Return empty array if no config found
+    return { playerUrls, player_json };  // Return empty array if no config found
 }
 
   static async stopVideo(ctx) {
@@ -250,8 +207,8 @@ class VimeoFetch {
       }
   }
 
-  static async requestAllUrls(fresnel_player_stats_session_id, playerurls, videoUrls, audioUrls, ctx) {
-      const allUrls = [...fresnel_player_stats_session_id, ...playerurls, ...videoUrls, ...audioUrls];
+  static async requestAllUrls(playerurls, videoUrls, audioUrls, ctx) {
+      const allUrls = [...playerurls, ...videoUrls, ...audioUrls];
     
       if (allUrls.length === 0) {
         ctx.log("No URLs to request.");
