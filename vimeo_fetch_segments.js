@@ -18,12 +18,13 @@ class VimeoFetch {
   async *run(ctx) {
     ctx.log("In Vimeo Behavior");
 
+    // Click Play
     await VimeoFetch.clickPlayButton(ctx);
 
 
     const { playerUrls, m3u8_url, player_json, fresnel_player_stats, session_id } = await VimeoFetch.readPlayerConfig(ctx);
         
-    // get player stats with session id
+    // Get player stats with session id
     if (fresnel_player_stats && session_id) {
       const fresnel_player_stats_session_id = `${fresnel_player_stats}?beacon=1&session-id=${session_id}`;
       ctx.log(`fresnel_player_stats_session_id: ${fresnel_player_stats_session_id}`);
@@ -33,7 +34,6 @@ class VimeoFetch {
       console.warn("No valid fresnel_player_stats or session_id");
     }
 
-
     /// get player urls
     if (playerUrls && playerUrls.length > 0) {
       ctx.Lib.getState(ctx, "Extracted segment URLs", playerUrls.join(", "));
@@ -42,11 +42,11 @@ class VimeoFetch {
       console.warn("No valid playerUrls found.");
     }
 
-    // Define arrays outside to persist values
+    // Arrays for Video and Segment URLs
     const videoUrls = [];
     const audioUrls = [];
 
-    /// get player_json urls
+    /// get playlist.json urls
     if (player_json && player_json.includes("vimeocdn.com") && player_json.includes("playlist.json")) {
       console.log("Detected Vimeo playlist.json URL:", player_json);
       ctx.log(`Extracted player_json URL: ${player_json}`);
@@ -106,7 +106,7 @@ class VimeoFetch {
         
         VimeoFetch.stopVideo(ctx);
         
-        // Ensure we request URLs after all processing
+        // Request Segment URLs
         await VimeoFetch.requestAllUrls([], [], videoUrls, audioUrls, ctx);
 
       } catch (error) {
@@ -135,7 +135,6 @@ class VimeoFetch {
     let player_json = null;
     let fresnel_player_stats = null;
     let session_id = null;
-    ctx.log("get mp4");
     const scriptTags = document.querySelectorAll('script');
     console.log("script tags:", scriptTags);
     ctx.log(`script tags: ${scriptTags}`);
@@ -150,8 +149,6 @@ class VimeoFetch {
 
         const regex = /window\.playerConfig\s*=\s*(\{.*\})/;
         const match = scriptContent.match(regex);
-        //console.log("match:", match);
-        //ctx.log(`match: ${match}`);
 
         function extractUrls(obj, collected = []) {
           for (const key in obj) {
@@ -240,10 +237,11 @@ class VimeoFetch {
 
     return { playerUrls, m3u8_url, player_json, fresnel_player_stats, session_id };  // Return empty array if no config found
 }
+
   static async stopVideo(ctx) {
       const videoElement = document.querySelector("video");
       if (videoElement) {
-        videoElement.pause();  // Pause the video
+        videoElement.pause();
         console.log("Video stopped.");
         ctx.log("Video stopped.");
       } else {
