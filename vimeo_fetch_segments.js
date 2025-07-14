@@ -1,4 +1,19 @@
-class VimeoFetch {
+export const BREADTH_ALL = Symbol("BREADTH_ALL");
+
+interface Context {
+  Lib: {
+    xpathNode: (xpath: string) => Element | null;
+    getState: (ctx: any, message: string, state: string) => any;
+  };
+  log: (message: string) => void;
+  state: {
+    played?: boolean;
+    comments: number;
+  };
+}
+
+
+export class VimeoFetch {
   static init() {
     return {
       state: { comments: 0 },
@@ -251,7 +266,13 @@ class VimeoFetch {
       }
   }
 
-  static async requestAllUrls(fresnel_player_stats_session_id, playerurls, videoUrls, audioUrls, ctx) {
+static async requestAllUrls(
+  fresnel_player_stats_session_id: string[],
+  playerurls: string[],
+  videoUrls: string[],
+  audioUrls: string[],
+  ctx: Context
+) {
   const allUrls = [
     ...fresnel_player_stats_session_id,
     ...playerurls,
@@ -276,7 +297,7 @@ class VimeoFetch {
     Referer: "https://player.vimeo.com",
   };
 
-  const failedUrls = [];
+  const failedUrls: string[] = [];
 
   const CONCURRENCY = 5;
   let index = 0;
