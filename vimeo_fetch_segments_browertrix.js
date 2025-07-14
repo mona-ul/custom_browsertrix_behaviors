@@ -1,4 +1,4 @@
-class VimeoFetch {
+export class VimeoFetch {
   static init() {
     return {
       state: { comments: 0 },
@@ -69,28 +69,29 @@ class VimeoFetch {
         const baseUrl = `https://vod-adaptive-ak.vimeocdn.com/${firstThreeSegments.join('/')}/remux/avf/`;
         console.log("Base URL:", baseUrl);
 
+
         // Process Video URLs
         if (jsonResponse.video && jsonResponse.video.length > 0) {
           jsonResponse.video.forEach((video) => {
-            const videoBaseUrl = video.base_url;
-            if (video.segments && video.segments.length > 0) {
+            if (video.id && video.segments && video.segments.length > 0) {
               video.segments.forEach((segment) => {
-                const fullUrl = new URL(segment.url, baseUrl + videoBaseUrl).href;
-                console.log(`Extracted Video URL: ${fullUrl}`);
-                ctx.log(`Extracted Video URL: ${fullUrl}`);
+                const fullUrl = new URL(segment.url, `${baseUrl}${video.id}/`).href;
+                console.log(`Extracted Video URL (${video.id}): ${fullUrl}`);
+                ctx.log(`Extracted Video URL (${video.id}): ${fullUrl}`);
                 videoUrls.push(fullUrl);
               });
             }
           });
         }
 
+
         // Process Audio URLs
         if (jsonResponse.audio && jsonResponse.audio.length > 0) {
           jsonResponse.audio.forEach((audio) => {
-            const audioBaseUrl = audio.base_url;
-            if (audio.segments && audio.segments.length > 0) {
+            //const audioBaseUrl = audio.base_url;
+            if (audio.id && audio.segments && audio.segments.length > 0) {
               audio.segments.forEach((segment) => {
-                const fullUrl = new URL(segment.url, baseUrl + audioBaseUrl).href;
+                const fullUrl = new URL(segment.url, `${baseUrl}${audio.id}/`).href;
                 console.log(`Extracted Audio URL: ${fullUrl}`);
                 ctx.log(`Extracted Audio URL: ${fullUrl}`);
                 audioUrls.push(fullUrl);
@@ -118,13 +119,13 @@ class VimeoFetch {
 
   static async clickPlayButton(ctx) {
     const playButton = document.querySelector("button[data-play-button]");
-    if (playButton) {
+    if (playButton instanceof HTMLElement) {
       playButton.click();
       console.log("Play button clicked.");
       ctx.log("Play button clicked.");
     } else {
-      console.warn("Play button not found.");
-      ctx.log("Play button not found.");
+      console.warn("Play button not found or is not an HTML element.");
+      ctx.log("Play button not found or not an HTMLElement.");
     }
   }
 
@@ -250,67 +251,81 @@ class VimeoFetch {
       }
   }
 
-  static async requestAllUrls(fresnel_player_stats_session_id, playerurls, videoUrls, audioUrls, ctx) {
-      const allUrls = [...fresnel_player_stats_session_id, ...playerurls, ...videoUrls, ...audioUrls];
-    
-      if (allUrls.length === 0) {
-        ctx.log("No URLs to request.");
-        return;
-      }
-    
-      ctx.log(`Total URLs to request: ${allUrls.length}`);
-    
-      const headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "*/*",
-        "Accept-Language": "en,de;q=0.7,en-US;q=0.3",
-        "Origin": "https://player.vimeo.com",
-        "DNT": "1",
-        "Referer": "https://player.vimeo.com",
-      };
-    
-      const failedUrls = [];  // Track failed URLs
-    
-      const fetchPromises = allUrls.map(async (url) => {
-        let attempts = 0;
-        let success = false;
-    
-        while (attempts < 3 && !success) {
-          try {
-            const response = await fetch(url, { headers });
-    
-            if (response.ok) {
-              ctx.log(`Successfully requested: ${url}`);
-              success = true;
-            } else {
-              ctx.log(`Request failed for ${url}. Status: ${response.status}`);
-            }
-          } catch (error) {
-            ctx.log(`Failed to request ${url}`);
+static async requestAllUrls(
+  fresnel_player_stats_session_id: string[],
+  playerurls: string[],
+  videoUrls: string[],
+  audioUrls: string[],
+  ctx: Context
+) {
+  const allUrls = [
+    ...fresnel_player_stats_session_id,
+    ...playerurls,
+    ...videoUrls,
+    ...audioUrls,
+  ];
+
+  if (allUrls.length === 0) {
+    ctx.log("No URLs to request.");
+    return;
+  }
+
+  ctx.log(`Total URLs to request: ${allUrls.length}`);
+
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    Accept: "*/*",
+    "Accept-Language": "en,de;q=0.7,en-US;q=0.3",
+    Origin: "https://player.vimeo.com",
+    DNT: "1",
+    Referer: "https://player.vimeo.com",
+  };
+
+  const failedUrls: string[] = [];
+
+  const CONCURRENCY = 5;
+  let index = 0;
+
+  async function worker() {
+    while (index < allUrls.length) {
+      const url = allUrls[index++];
+      let attempts = 0;
+      let success = false;
+
+      while (attempts < 3 && !success) {
+        try {
+          const response = await fetch(url, { headers });
+          if (response.ok) {
+            ctx.log(`Successfully requested: ${url}`);
+            success = true;
+          } else {
+            ctx.log(`Request failed for ${url}. Status: ${response.status}`);
           }
-    
-          attempts++;
-    
-          if (!success) {
-            ctx.log(`Retrying ${url} (${attempts}/3)`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
+        } catch (e) {
+          ctx.log(`Fetch error for ${url}: ${e}`);
         }
-    
+
+        attempts++;
         if (!success) {
-          failedUrls.push(url);  // Add the failed URL to the list
+          ctx.log(`Retrying ${url} (${attempts}/3)`);
+          await new Promise((r) => setTimeout(r, 2000));
         }
-      });
-    
-      await Promise.all(fetchPromises);  // Ensure all requests complete before moving on
-      ctx.log(`Failed URLs: ${failedUrls.length}`);
-      failedUrls.forEach(url => ctx.log(`FAILED: ${url}`));
-      if (failedUrls.length > 0) {
-        ctx.log("The following URLs failed to be requested:");
-        failedUrls.forEach(url => ctx.log(url));  // Print all failed URLs
-      } else {
-        ctx.log("All URLs have been requested successfully.");
       }
+
+      if (!success) {
+        failedUrls.push(url);
+      }
+
+      await new Promise((r) => setTimeout(r, 200)); // slight delay between requests
     }
-    
+  }
+
+  // Launch up to CONCURRENCY parallel workers
+  const workers = Array.from({ length: CONCURRENCY }, () => worker());
+  await Promise.all(workers);
+
+  ctx.log(`Failed URLs: ${failedUrls.length}`);
+  failedUrls.forEach((url) => ctx.log(`FAILED: ${url}`));
+}
 }
