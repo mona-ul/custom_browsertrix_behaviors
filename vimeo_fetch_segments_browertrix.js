@@ -256,7 +256,7 @@ static async requestAllUrls(
   playerurls: string[],
   videoUrls: string[],
   audioUrls: string[],
-  ctx: Context
+  ctx
 ) {
   const allUrls = [
     ...fresnel_player_stats_session_id,
