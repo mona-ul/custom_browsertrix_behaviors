@@ -1,4 +1,4 @@
-export class VimeoFetch {
+class VimeoFetch {
   static init() {
     return {
       state: { comments: 0 },
@@ -251,13 +251,7 @@ export class VimeoFetch {
       }
   }
 
-static async requestAllUrls(
-  fresnel_player_stats_session_id: string[],
-  playerurls: string[],
-  videoUrls: string[],
-  audioUrls: string[],
-  ctx
-) {
+  static async requestAllUrls(fresnel_player_stats_session_id, playerurls, videoUrls, audioUrls, ctx) {
   const allUrls = [
     ...fresnel_player_stats_session_id,
     ...playerurls,
@@ -282,7 +276,7 @@ static async requestAllUrls(
     Referer: "https://player.vimeo.com",
   };
 
-  const failedUrls: string[] = [];
+  const failedUrls = [];
 
   const CONCURRENCY = 5;
   let index = 0;
